@@ -133,6 +133,7 @@ index_directory() {
 index_file() {
   local file="$1"
   message verbose "Indexing \"${file}\""
+  tesseract "${file}" stdout 2>/dev/null
 }
 
 main "$@"
