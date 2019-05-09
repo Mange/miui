@@ -77,11 +77,18 @@ search_directory() {
     die "Could not find metadata in \"${directory}\". Have you indexed it?"
   fi
 
-  generate_search_data "$metadata_dir" | \
-    fzf \
-      --preview "${PREVIEW_SCRIPT} {1}" \
-      --delimiter="\0" \
-      --with-nth 2..
+  selected="$(
+    generate_search_data "$metadata_dir" \
+      | fzf \
+        --preview "${PREVIEW_SCRIPT} {1}" \
+        --delimiter="\0" \
+        --with-nth 2.. \
+      | cut -d $'\0' -f 1
+  )"
+
+  if [[ -n "$selected" ]]; then
+    filename_from_metadata_file "$selected"
+  fi
 }
 
 generate_search_data() {
