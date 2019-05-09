@@ -1,23 +1,7 @@
 #!/usr/bin/env bash
 
-version=0.1.0
-metadata_dir_name=.miui
-
-print_version() {
-  echo "miui ${version}"
-}
-
-die() {
-  echo "$@" >&2
-  exit 1
-}
-
-die_with_usage() {
-  echo "$@" >&2
-  echo "" >&2
-  print_usage >&2
-  exit 1
-}
+# shellcheck source=shared.sh
+. "$(dirname "$0")/shared.sh"
 
 print_usage() {
   print_version
@@ -46,7 +30,7 @@ fi
 eval set -- "$TEMP"
 unset TEMP
 
-max_verbosity=1
+export MAX_VERBOSITY=1
 
 while true; do
   case "$1" in
@@ -59,11 +43,11 @@ while true; do
       exit 0
       ;;
     "--verbose" | "-v")
-      max_verbosity=2
+      MAX_VERBOSITY=2
       shift
       ;;
     "--quiet" | "-q")
-      max_verbosity=0
+      MAX_VERBOSITY=0
       shift
       ;;
     "--")
@@ -75,49 +59,6 @@ while true; do
       ;;
   esac
 done
-
-verbosity_number() {
-  case "$1" in
-    quiet)
-      echo 0
-      ;;
-    normal)
-      echo 1
-      ;;
-    verbose)
-      echo 2
-      ;;
-    *)
-      die "Invalid verbosity \"$1\""
-      ;;
-  esac
-}
-
-message() {
-  local comparator="-le"
-
-  if [[ $# -gt 2 ]]; then
-    comparator="$1"
-    shift
-  fi
-
-  local msg_verbosity="$1"
-  shift
-
-  if test "$(verbosity_number "$msg_verbosity")" "$comparator" "$max_verbosity"; then
-    echo "$@" >&2
-  fi
-}
-
-message_stream() {
-  local msg_verbosity="$1"
-
-  if [[ "$(verbosity_number "$msg_verbosity")" -le "$max_verbosity" ]]; then
-    cat >&2
-  else
-    cat >/dev/null
-  fi
-}
 
 main() {
   local directory
@@ -141,7 +82,7 @@ index_directory() {
   local indexed=0
 
   # Create metadata directory if it does not exist
-  mkdir -p "${directory}/${metadata_dir_name}"
+  mkdir -p "${directory}/${METADATA_DIR_NAME}"
 
   while read -rd $'\0' file; do
     index_file "$file"
@@ -150,7 +91,7 @@ index_directory() {
     # Find image file in directory, but don't
     find \
       "$directory" \
-      -path "${metadata_dir_name}" -prune -or \
+      -path "${METADATA_DIR_NAME}" -prune -or \
       \( -iname '*.jpg' -or -iname '*.png' -or -iname '*.gif' \) \
       -print0
   )
@@ -159,18 +100,6 @@ index_directory() {
   message "-eq" normal ""
 
   message normal "Processed ${indexed} file(s)"
-}
-
-metadata_filename_for() {
-  local file="$1"
-  local metadata_type="${2:-text}"
-  local path
-  local basename
-
-  path="$(dirname "$file")"
-  basename="$(basename "$file")"
-
-  echo "${path}/${metadata_dir_name}/${basename}.${metadata_type}"
 }
 
 index_file() {
