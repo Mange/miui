@@ -6,6 +6,18 @@ print_version() {
   echo "miui ${version}"
 }
 
+die() {
+  echo "$@" >&2
+  exit 1
+}
+
+die_with_usage() {
+  echo "$@" >&2
+  echo "" >&2
+  print_usage >&2
+  exit 1
+}
+
 print_usage() {
   print_version
   cat <<USAGE
@@ -46,10 +58,22 @@ while true; do
       break
       ;;
     *)
-      echo "Unknown option: $1" >&2
-      echo "" >&2
-      print_usage >&2
-      exit 1
+      die_with_usage "Unknown option: $1"
       ;;
   esac
 done
+
+directory=
+
+if [[ $# -eq 1 ]]; then
+  directory="$1"
+  if ! [[ -d "$directory" ]]; then
+    die "Error: \"${directory}\" is not a directory"
+  fi
+elif [[ $# -gt 1 ]]; then
+  die_with_usage "Only one directory can be specified!"
+else
+  die_with_usage "You must specify a directory."
+fi
+
+echo "Running in ${directory}"
