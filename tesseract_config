@@ -1,0 +1,6 @@
+load_bigram_dawg F
+load_freq_dawg F
+load_number_dawg F
+load_punc_dawg F
+load_system_dawg F
+load_unambig_dawg F

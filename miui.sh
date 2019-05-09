@@ -3,6 +3,8 @@
 # shellcheck source=shared.sh
 . "$(dirname "$0")/shared.sh"
 
+TESSERACT_CONFIG_FILE="$(dirname "$0")/tesseract_config"
+
 print_usage() {
   print_version
   cat <<USAGE
@@ -11,17 +13,18 @@ Usage: $0 [options] <directory>
 Indexes all images in the given directory.
 
 OPTIONS:
-  --help                   - Show this help text.
-  -V, --version            - Show version information.
-  -v, --verbose            - Show more information during indexing.
-  -q, --quiet              - Show less information during indexing.
+  --help            - Show this help text.
+  -V, --version     - Show version information.
+  -v, --verbose     - Show more information during indexing.
+  -q, --quiet       - Show less information during indexing.
+  -f, --force       - Reindex files even if they have up-to-date metadata.
 USAGE
 }
 
 if ! TEMP=$(
   getopt \
-    -o 'Vvq' \
-    --long 'help,version,verbose,quiet' \
+    -o 'Vvqf' \
+    --long 'help,version,verbose,quiet,force' \
     -- "$@"
 ); then
   echo "Failed to parse arguments…" >&2
@@ -31,6 +34,7 @@ eval set -- "$TEMP"
 unset TEMP
 
 export MAX_VERBOSITY=1
+FORCE=no
 
 while true; do
   case "$1" in
@@ -48,6 +52,10 @@ while true; do
       ;;
     "--quiet" | "-q")
       MAX_VERBOSITY=0
+      shift
+      ;;
+    "--force" | "-f")
+      FORCE=yes
       shift
       ;;
     "--")
@@ -107,15 +115,31 @@ index_file() {
   local metadata_file
   metadata_file="$(metadata_filename_for "$file")"
 
-  if [[ ! -f "$metadata_file" || "$file" -nt "$metadata_file" ]]; then
+  if [[ "$FORCE" == "yes" || ! -f "$metadata_file" || "$file" -nt "$metadata_file" ]]; then
     message "-eq" verbose "Indexing \"${file}\""
     message "-eq" normal -n "."
 
-    tesseract "${file}" stdout 2> >(message_stream verbose) 1> "${metadata_file}"
+    process_image "$file" | \
+      tesseract \
+        stdin \
+        stdout \
+        -l eng \
+        "$TESSERACT_CONFIG_FILE" \
+        2> >(message_stream verbose) \
+      | sed 's/[ \t]{2}/ /; /^[[:space:]]*$/d' > "${metadata_file}"
   else
     message "-eq" verbose "Skipping \"${file}\""
     message "-eq" normal -n "S"
   fi
+}
+
+process_image() {
+  convert \
+    -trim \
+    -resize 200% \
+    -unsharp 0x5 \
+    -colorspace Gray \
+    "$1" -
 }
 
 main "$@"
