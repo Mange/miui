@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 version=0.1.0
+metadata_dir_name=.miui
 
 print_version() {
   echo "miui ${version}"
@@ -93,11 +94,28 @@ verbosity_number() {
 }
 
 message() {
+  local comparator="-le"
+
+  if [[ $# -gt 2 ]]; then
+    comparator="$1"
+    shift
+  fi
+
   local msg_verbosity="$1"
-  local message="$2"
+  shift
+
+  if test "$(verbosity_number "$msg_verbosity")" "$comparator" "$max_verbosity"; then
+    echo "$@" >&2
+  fi
+}
+
+message_stream() {
+  local msg_verbosity="$1"
 
   if [[ "$(verbosity_number "$msg_verbosity")" -le "$max_verbosity" ]]; then
-    echo "$message" >&2
+    cat >&2
+  else
+    cat >/dev/null
   fi
 }
 
@@ -120,20 +138,55 @@ main() {
 
 index_directory() {
   local directory="$1"
+  local indexed=0
+
+  # Create metadata directory if it does not exist
+  mkdir -p "${directory}/${metadata_dir_name}"
+
   while read -rd $'\0' file; do
     index_file "$file"
+    indexed=$((indexed + 1))
   done < <(
+    # Find image file in directory, but don't
     find \
       "$directory" \
+      -path "${metadata_dir_name}" -prune -or \
       \( -iname '*.jpg' -or -iname '*.png' -or -iname '*.gif' \) \
       -print0
   )
+
+  # Print newline after "....S...S...."-progress bar
+  message "-eq" normal ""
+
+  message normal "Processed ${indexed} file(s)"
+}
+
+metadata_filename_for() {
+  local file="$1"
+  local metadata_type="${2:-text}"
+  local path
+  local basename
+
+  path="$(dirname "$file")"
+  basename="$(basename "$file")"
+
+  echo "${path}/${metadata_dir_name}/${basename}.${metadata_type}"
 }
 
 index_file() {
   local file="$1"
-  message verbose "Indexing \"${file}\""
-  tesseract "${file}" stdout 2>/dev/null
+  local metadata_file
+  metadata_file="$(metadata_filename_for "$file")"
+
+  if [[ ! -f "$metadata_file" || "$file" -nt "$metadata_file" ]]; then
+    message "-eq" verbose "Indexing \"${file}\""
+    message "-eq" normal -n "."
+
+    tesseract "${file}" stdout 2> >(message_stream verbose) 1> "${metadata_file}"
+  else
+    message "-eq" verbose "Skipping \"${file}\""
+    message "-eq" normal -n "S"
+  fi
 }
 
 main "$@"
